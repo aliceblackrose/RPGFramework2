@@ -9,6 +9,8 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class PlayerProfile {
+    public static final long EXPERIENCE_PER_TALENT_POINT = 100L;
+
     private final UUID uuid;
     private String name;
     private Classes combatClass;
@@ -72,18 +74,55 @@ public final class PlayerProfile {
     }
 
     public void addExperience(long amount) {
-        if (amount < 0) {
+        if (amount < 0L) {
             throw new IllegalArgumentException("amount must not be negative");
         }
         experience = Math.addExact(experience, amount);
     }
 
     public long talentPoints(Talent talent) {
-        return talentPoints.getOrDefault(Objects.requireNonNull(talent), 0L);
+        return talentPoints.getOrDefault(Objects.requireNonNull(talent, "talent"), 0L);
     }
 
     public void setTalentPoints(Talent talent, long points) {
-        talentPoints.put(Objects.requireNonNull(talent), clampPoints(talent, points));
+        talentPoints.put(Objects.requireNonNull(talent, "talent"), clampPoints(talent, points));
+    }
+
+    public void allocateTalent(Talent talent, long points) {
+        Objects.requireNonNull(talent, "talent");
+        if (points <= 0L) {
+            throw new IllegalArgumentException("points must be positive");
+        }
+        if (points > unallocatedPoints()) {
+            throw new IllegalStateException("not enough unallocated talent points");
+        }
+
+        long current = talentPoints(talent);
+        long updated;
+        try {
+            updated = Math.addExact(current, points);
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("talent point total is too large", exception);
+        }
+        if (updated > talent.maxPoints()) {
+            throw new IllegalStateException(talent.displayName() + " is already at its maximum");
+        }
+
+        talentPoints.put(talent, updated);
+    }
+
+    public void resetTalents() {
+        for (Talent talent : Talent.values()) {
+            talentPoints.put(talent, 0L);
+        }
+    }
+
+    public long spentTalentPoints() {
+        long spent = 0L;
+        for (long points : talentPoints.values()) {
+            spent = Math.addExact(spent, points);
+        }
+        return spent;
     }
 
     public Set<String> artifacts() {
@@ -97,9 +136,9 @@ public final class PlayerProfile {
     }
 
     public int unallocatedPoints() {
-        long allocated = talentPoints.values().stream().mapToLong(Long::longValue).sum();
-        long earned = experience / 100L;
-        return (int) Math.max(0L, Math.min(Integer.MAX_VALUE, earned - allocated));
+        long earned = experience / EXPERIENCE_PER_TALENT_POINT;
+        long remaining = Math.max(0L, earned - spentTalentPoints());
+        return (int) Math.min(Integer.MAX_VALUE, remaining);
     }
 
     public PlayerSnapshot snapshot() {

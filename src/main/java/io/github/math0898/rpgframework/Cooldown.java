@@ -1,22 +1,33 @@
 package io.github.math0898.rpgframework;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Objects;
+import java.util.function.LongSupplier;
 
 /**
- * Monotonic-by-contract cooldown value based on wall-clock instants.
+ * A monotonic cooldown backed by a nano-time source.
  */
 public final class Cooldown {
-    private Instant readyAt = Instant.EPOCH;
+    private final LongSupplier ticker;
+    private long readyAtNanos;
+
+    public Cooldown() {
+        this(System::nanoTime);
+    }
+
+    Cooldown(LongSupplier ticker) {
+        this.ticker = Objects.requireNonNull(ticker, "ticker");
+        this.readyAtNanos = ticker.getAsLong();
+    }
 
     public boolean ready() {
-        return !Instant.now().isBefore(readyAt);
+        return remaining().isZero();
     }
 
     public Duration remaining() {
-        var remaining = Duration.between(Instant.now(), readyAt);
-        return remaining.isNegative() ? Duration.ZERO : remaining;
+        long now = ticker.getAsLong();
+        long remainingNanos = readyAtNanos - now;
+        return remainingNanos <= 0L ? Duration.ZERO : Duration.ofNanos(remainingNanos);
     }
 
     public void start(Duration duration) {
@@ -24,10 +35,18 @@ public final class Cooldown {
         if (duration.isNegative()) {
             throw new IllegalArgumentException("duration must not be negative");
         }
-        readyAt = Instant.now().plus(duration);
+
+        final long durationNanos;
+        try {
+            durationNanos = duration.toNanos();
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("duration is too large", exception);
+        }
+
+        readyAtNanos = ticker.getAsLong() + durationNanos;
     }
 
     public void reset() {
-        readyAt = Instant.EPOCH;
+        readyAtNanos = ticker.getAsLong();
     }
 }
