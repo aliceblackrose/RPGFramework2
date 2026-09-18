@@ -1,131 +1,86 @@
 package io.github.math0898.rpgframework.parties;
 
-import io.github.math0898.rpgframework.PlayerManager;
-import io.github.math0898.rpgframework.RpgPlayer;
-import io.github.math0898.rpgframework.classes.Classes;
+import io.github.math0898.rpgframework.RPGFramework;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 
-import java.util.ArrayList;
+@Deprecated(forRemoval = false)
+public final class PartyManager {
+    private static PartyService service;
+    private static final Set<UUID> PARTY_CHAT = ConcurrentHashMap.newKeySet();
+    private static final Listener LISTENER = new PartyListener();
 
-import static io.github.math0898.rpgframework.RPGFramework.plugin;
-
-/**
- * The party manager handles things relating to parties in general. This includes things like party chat.
- *
- * @author Sugaku
- */
-public class PartyManager implements Listener {
-
-    /**
-     * The list of players who are currently using party chat.
-     */
-    private static final ArrayList<Player> partyChatPlayers = new ArrayList<>();
-
-    /**
-     * The list of currently active players. When the last player leaves a party it is removed from this list.
-     */
-    private static final ArrayList<Party> parties = new ArrayList<>();
-
-    /**
-     * Initializes the party manager so that it can listen to events.
-     */
-    public static void init () {
-        Bukkit.getPluginManager().registerEvents(new PartyManager(), plugin);
+    private PartyManager() {
     }
 
-    /**
-     * Adds a party to the current list of parties.
-     *
-     * @param p The party to add to the list.
-     */
-    public static void addParty (Party p) {
-        parties.add(p);
+    public static void init() {
     }
 
-    /**
-     * Removes a party from the current list of parties.
-     *
-     * @param p The party to remove from the list.
-     */
-    public static void removeParty (Party p) {
-        parties.remove(p);
+    public static void bind(PartyService partyService) {
+        service = Objects.requireNonNull(partyService);
     }
 
-    /**
-     * Finds the party that a player is currently in.
-     *
-     * @param player The player to locate the party of.
-     * @return The party this player is a member of. Null otherwise.
-     */
-    public static Party findParty (Player player) {
-        for (Party p : parties) if (p.hasMember(player)) return p;
-        return null;
+    public static void unbind() {
+        service = null;
+        PARTY_CHAT.clear();
     }
 
-    /**
-     * Toggles party chat for the given player. If they are not currently at a party this will fail.
-     *
-     * @param player The player to toggle party chat for.
-     */
-    public static void togglePartyChat (Player player) {
-        if (partyChatPlayers.contains(player)) {
-            player.sendMessage(ChatColor.GREEN + "You have left party chat!"); // todo clean these messages up.
-            partyChatPlayers.remove(player);
-        } else if (findParty(player) != null) {
-            player.sendMessage(ChatColor.GREEN + "You have joined party chat!");
-            partyChatPlayers.add(player);
-        } else player.sendMessage(ChatColor.RED + "You must be in a party to toggle party chat.");
+    public static Listener listener() {
+        return LISTENER;
     }
 
-    /**
-     * Handles the even when a player tries to chat. If they have party chat enabled the message will be sent to their
-     * party.
-     *
-     * @param event The chat event.
-     */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onChat (AsyncPlayerChatEvent event) {
-        Player p = event.getPlayer();
-        if (partyChatPlayers.contains(p)) {
-            event.setCancelled(true);
-            Party party = findParty(p);
-            if (party == null) return;
-            RpgPlayer rpg = PlayerManager.getPlayer(p.getUniqueId());
-            String prefix = ChatColor.GREEN + p.getName() + ChatColor.DARK_GRAY + " > " + ChatColor.LIGHT_PURPLE;
-            if (rpg == null) prefix = ChatColor.DARK_GRAY + "[" + Classes.NONE.getFormattedName() + ChatColor.DARK_GRAY + "] " + prefix;
-            else prefix = ChatColor.DARK_GRAY + "[" + rpg.getCombatClass().getFormattedName() + ChatColor.DARK_GRAY + "] " + prefix;
-            party.sendAll(prefix + event.getMessage());
-            Bukkit.getConsoleSender().sendMessage(prefix + event.getMessage());
+    public static void addParty(Party party) {
+        Objects.requireNonNull(party);
+        PartyService current = requireService();
+        current.create(party.leader());
+        for (UUID member : party.members()) {
+            if (!member.equals(party.leader())) {
+                current.invite(party.leader(), member);
+                current.accept(member, true);
+            }
         }
     }
 
-    /**
-     * Handles when two players hit one another and checks if they're in the same party. In that case the damage should
-     * be negated.
-     *
-     * @param event The player attack player event.
-     */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onDamage (EntityDamageByEntityEvent event) {
-        Player attacker;
-        Player victim;
-        if (event.getEntity() instanceof Player) victim = (Player) event.getEntity();
-        else return;
-        if (event.getDamager() instanceof Arrow arrow) {
-            if (arrow.getShooter() instanceof Player) attacker = (Player) arrow.getShooter();
-            else return;
-        } else if (event.getDamager() instanceof Player ) attacker = (Player) event.getDamager();
-        else return;
-        Party a = findParty(attacker);
-        Party v = findParty(victim);
-        if (a != null && v != null) if (a.equals(v)) event.setCancelled(true);
+    public static void removeParty(Party party) {
+        requireService().removeParty(party);
+    }
+
+    public static Party findParty(Player player) {
+        return requireService().find(player.getUniqueId()).orElse(null);
+    }
+
+    public static void togglePartyChat(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (!PARTY_CHAT.add(uuid)) {
+            PARTY_CHAT.remove(uuid);
+        }
+    }
+
+    private static PartyService requireService() {
+        return Objects.requireNonNull(service, "RPGFramework is not enabled");
+    }
+
+    private static final class PartyListener implements Listener {
+        @EventHandler(ignoreCancelled = true)
+        public void onDamage(EntityDamageByEntityEvent event) {
+            if (!(event.getDamager() instanceof Player attacker)
+                    || !(event.getEntity() instanceof Player victim)) {
+                return;
+            }
+            Party party = findParty(attacker);
+            if (party != null && party.contains(victim.getUniqueId())) {
+                event.setCancelled(true);
+                attacker.sendMessage(Component.text("You cannot damage a party member.", NamedTextColor.RED));
+            }
+        }
     }
 }

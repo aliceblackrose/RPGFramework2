@@ -1,82 +1,44 @@
 package io.github.math0898.rpgframework.damage;
 
-/**
- * This enum describes the levels of resistance to a particular kind of damage.
- *
- * @author Sugaku
- */
 public enum DamageResistance {
+    IMMUNITY(-2, 0.0),
+    RESISTANCE(-1, 0.5),
+    NORMAL(0, 1.0),
+    SUSCEPTIBILITY(1, 1.5),
+    VULNERABILITY(2, 2.0);
 
-    /**
-     * Nullifies all damage.
-     */
-    IMMUNITY,
+    private final int level;
+    private final double multiplier;
 
-    /**
-     * Halves the damage taken.
-     */
-    RESISTANCE,
-
-    /**
-     * Applies no modifier to damage taken.
-     */
-    NORMAL,
-
-    /**
-     * Increases the damage taken by 50% for a total of 150%.
-     */
-    SUSCEPTIBILITY,
-
-    /**
-     * Doubles the damage taken.
-     */
-    VULNERABILITY;
-
-    /**
-     * Merges two damage resistance levels into one damage resistance level.
-     *
-     * @param resistance1 The first resistance.
-     * @param resistance2 The second resistance.
-     * @return The merged resistance.
-     */
-    public static DamageResistance mergeResistances (DamageResistance resistance1, DamageResistance resistance2) {
-        int i = getInt(resistance1);
-        int j = getInt(resistance2);
-        return getResistance(i + j);
+    DamageResistance(int level, double multiplier) {
+        this.level = level;
+        this.multiplier = multiplier;
     }
 
-    /**
-     * Returns the int value of the enum entry.
-     *
-     * @param resistance The resistance level being converted.
-     * @return The int value of the resistance.
-     */
-    public static int getInt (DamageResistance resistance) {
-        return switch (resistance) {
-            case IMMUNITY -> -2;
-            case RESISTANCE -> -1;
-            case NORMAL -> 0;
-            case SUSCEPTIBILITY -> 1;
-            case VULNERABILITY -> 2;
-        };
+    public double apply(double damage) {
+        return Math.max(0.0, damage) * multiplier;
     }
 
-    /**
-     * Returns the enum value of the int.
-     *
-     * @param integer The integer being converted to a damage resistance.
-     * @return The enum value of the integer.
-     */
-    public static DamageResistance getResistance (int integer) {
-        if (integer <= -2) return DamageResistance.IMMUNITY;
-        else if (integer >= 2) return DamageResistance.VULNERABILITY;
-        return switch (integer) {
-            case -1 -> DamageResistance.RESISTANCE;
-            case 0 -> DamageResistance.NORMAL;
-            case 1 -> DamageResistance.SUSCEPTIBILITY;
-            default ->
-                    //There's nothing to do. We've handled (-\infinity, \infinity)
-                    null;
+    public static DamageResistance mergeResistances(DamageResistance first, DamageResistance second) {
+        return getResistance(first.level + second.level);
+    }
+
+    public static int getInt(DamageResistance resistance) {
+        return resistance.level;
+    }
+
+    public static DamageResistance getResistance(int value) {
+        if (value <= -2) {
+            return IMMUNITY;
+        }
+        if (value >= 2) {
+            return VULNERABILITY;
+        }
+        return switch (value) {
+            case -1 -> RESISTANCE;
+            case 0 -> NORMAL;
+            case 1 -> SUSCEPTIBILITY;
+            default -> throw new IllegalStateException("Unreachable resistance value: " + value);
         };
     }
 }

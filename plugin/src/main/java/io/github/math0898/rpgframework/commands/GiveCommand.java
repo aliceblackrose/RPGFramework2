@@ -1,92 +1,56 @@
 package io.github.math0898.rpgframework.commands;
 
-import io.github.math0898.rpgframework.items.ItemManager;
-import io.github.math0898.utils.commands.BetterCommand;
+import io.github.math0898.rpgframework.items.ItemRegistry;
+import io.papermc.paper.command.brigadier.BasicCommand;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import java.util.Collection;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+public final class GiveCommand implements BasicCommand {
+    private final ItemRegistry items;
 
-/**
- * The give command is used to give items registered in the ItemManager. Requires admin permissions.
- *
- * @author Sugaku
- */
-public class GiveCommand extends BetterCommand {
-
-    /**
-     * Creates a new BetterCommand with the given name.
-     */
-    public GiveCommand () {
-        super("rpg-give", ChatColor.DARK_GRAY + "[" + ChatColor.DARK_GREEN + "RPG" + ChatColor.DARK_GRAY + "] ");
+    public GiveCommand(ItemRegistry items) {
+        this.items = items;
     }
 
-    /**
-     * Called whenever specifically a player executes this command.
-     *
-     * @param player The player who ran this command.
-     * @param args   The arguments they passed to the command.
-     */
     @Override
-    public boolean onPlayerCommand (Player player, String[] args) {
-        return onNonPlayerCommand(player, args);
-    }
-
-    /**
-     * Called whenever an unspecified sender executes this command. This could include console and command blocks.
-     *
-     * @param sender The sender who ran this command.
-     * @param args   The arguments they passed to the command.
-     */
-    @Override
-    public boolean onNonPlayerCommand (CommandSender sender, String[] args) {
-        if (args.length < 2) {
-            send(sender, ChatColor.RED + "Something about that seemed off.");
-            send(sender, ChatColor.GRAY + "- /rpg-give <target> <item> (amnt)", false);
-            return true;
+    public void execute(CommandSourceStack source, String[] args) {
+        if (args.length < 1 || args.length > 2) {
+            CommandSupport.error(source, "Usage: /rpg-give <item-id> [player]");
+            return;
         }
-        Player target = Bukkit.getPlayer(args[0]);
+
+        Player target;
+        if (args.length == 2) {
+            target = Bukkit.getPlayerExact(args[1]);
+        } else {
+            target = CommandSupport.requirePlayer(source);
+        }
         if (target == null) {
-            send(sender, ChatColor.RED + "We could not the player " + args[0] + ".");
-            return true;
+            CommandSupport.error(source, "Target player is not online.");
+            return;
         }
-        if (!ItemManager.getInstance().hasItem(args[1])) {
-            send(sender, ChatColor.RED + "We could not find " + args[1] + ".");
-            return true;
+
+        var definition = items.find(args[0]).orElse(null);
+        if (definition == null) {
+            CommandSupport.error(source, "Unknown RPG item: " + args[0]);
+            return;
         }
-        int count = getIntegerParam(2, args, sender);
-        for (int i = 0; i < count; i++) {
-            Map<Integer, ItemStack> leftOvers = target.getInventory().addItem(ItemManager.getInstance().getItem(args[1]));
-            if (!leftOvers.isEmpty())
-                leftOvers.forEach((n, item) -> target.getWorld().dropItem(target.getLocation(), item));
-        }
-        send(sender, ChatColor.GREEN + "Item given!");
-        send(target, ChatColor.GREEN + "You have been given: " + args[1] + " x" + count);
-        return true;
+
+        var stack = definition.getItemStack();
+        target.getInventory().addItem(stack).values()
+                .forEach(leftover -> target.getWorld().dropItemNaturally(target.getLocation(), leftover));
+        CommandSupport.info(source, "Gave " + definition.id() + " to " + target.getName() + ".");
     }
 
-    /**
-     * Called whenever a command sender is trying to tab complete a command.
-     *
-     * @param sender The sender who is tab completing this command.
-     * @param args   The current arguments they have typed.
-     */
     @Override
-    public List<String> simplifiedTab(CommandSender sender, String[] args) {
-        List<String> list = new ArrayList<>();
-        if (args.length == 1) {
-            for (Player p : Bukkit.getOnlinePlayers())
-                list.add(p.getName());
-        } else if (args.length == 2) {
-            list = ItemManager.getInstance().getItemNames();
-            list.sort(String::compareToIgnoreCase);
-        } else if (args.length == 3)
-            return List.of("(amnt)");
-        return everythingStartsWith(list, args[args.length - 1]);
+    public String permission() {
+        return "rpg.admin";
+    }
+
+    @Override
+    public Collection<String> suggest(CommandSourceStack source, String[] args) {
+        return args.length <= 1 ? items.ids() : Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
     }
 }

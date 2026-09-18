@@ -1,870 +1,108 @@
 package io.github.math0898.rpgframework;
 
-import io.github.math0898.rpgframework.classes.AbstractClass;
-import io.github.math0898.rpgframework.classes.implementations.*;
-import io.github.math0898.rpgframework.classes.Class;
-import io.github.math0898.utils.StringUtils;
-import io.github.math0898.rpgframework.items.EquipmentSlots;
-import io.github.math0898.rpgframework.items.ItemManager;
-import io.github.math0898.rpgframework.items.RpgItem;
-import io.github.math0898.rpgframework.parties.Party;
-import io.github.math0898.utils.Utils;
-import io.github.math0898.utils.items.AttributeBuilder;
-import lombok.Getter;
-import lombok.Setter;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Sound;
-import org.bukkit.World;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeInstance;
-import org.bukkit.attribute.AttributeModifier;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.ItemStack;
 import io.github.math0898.rpgframework.classes.Classes;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import io.github.math0898.rpgframework.enemies.CustomMob;
+import io.github.math0898.rpgframework.player.PlayerProfile;
+import io.github.math0898.rpgframework.player.Talent;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
-import java.util.*;
+@Deprecated(forRemoval = false)
+public final class RpgPlayer {
+    public static final double HEALTH_PER_POINT = 5.0;
+    public static final double DAMAGE_PER_POINT = 1.0;
+    public static final double CRIT_CHANCE_PER_POINT = 0.025;
+    public static final long CRIT_CHANCE_MAX_POINTS = 40;
+    public static final double MOVEMENT_SPEED_PER_POINT = 0.03;
+    public static final long MOVEMENT_SPEED_MAX_POINTS = 10;
 
-/**
- * The RpgPlayer is the RPG-Framework plugin's wrapper for the Bukkit player. It contains a lot of information about
- * specific players including their experience, current class, and party affiliations. There are also significant helper
- * methods for getting friendly/enemy caster targets, healing and damaging the player, and managing class abilities.
- *
- * @author Sugaku
- */
-public class RpgPlayer {
-
-    /**
-     * A static prefix to send to all players.
-     */
-    private static final String MESSAGE_PREFIX = ChatColor.DARK_GRAY + "[" + ChatColor.DARK_GREEN + "RPG" + ChatColor.DARK_GRAY + "] " + ChatColor.GRAY;
-
-    /**
-     * The amount of time in millis it takes to be considered out of combat.
-     */
-    private static final long TIME_UNTIL_OUT_OF_COMBAT = 10000;
-
-    /**
-     * The amount of health granted per talent point spent on maximum health.
-     */
-    public static final double HEALTH_PER_POINT = 5; // todo: Configurable because of balance. Ideally during runtime.
-
-    /**
-     * The amount of base damage granted per talent point spent on damage.
-     */
-    public static final double DAMAGE_PER_POINT = 1; // todo: Configurable because of balance. Ideally during runtime.
-
-    /**
-     * The amount of critical strike chance given to a player per talent point spent.
-     */
-    public static final double CRIT_CHANCE_PER_POINT = 0.025; // todo: Configurable because of balance. Ideally during runtime.
-
-    /**
-     * The maximum number of points that can be spent on critical strike chance.
-     */
-    public static final long CRIT_CHANCE_MAX_POINTS = 40; // todo: Configurable because of balance. Ideally during runtime.
-
-    /**
-     * The amount of movement speed given to a player per point spent.
-     */
-    public static final double MOVEMENT_SPEED_PER_POINT = 0.03; // todo: Configurable because of balance. Ideally during runtime.
-
-    /**
-     * The maximum number of points that can be spent on movement speed.
-     */
-    public static final long MOVEMENT_SPEED_MAX_POINTS = 10; // todo: Configurable because of balance. Ideally during runtime.
-    // todo: loot drop rate
-    //      critical damage
-    /**
-     * A list of artifacts that have been collected by this player.
-     * -- GETTER --
-     *  Accessor method for the artifact collection of this player.
-     */
-    @Getter
-    private final List<String> artifactCollection = new ArrayList<>();
-
-    /**
-     * The time in millis that this player was last fighting.
-     */
-    private long fighting = 0L;
-
-    /**
-     * Whether we have applied effects for leaving combat yet or not.
-     */
-    private boolean appliedOutCombat = false;
-
-    /**
-     * The Entity that last successfully hit this player.
-     * -- GETTER --
-     *  An accessor method to get the last Entity that attacked this Player.
-     */
-    @Getter
-    private Entity lastHitBy = null;
-
-    /**
-     * The amount of XP that this player has accumulated.
-     * -- GETTER --
-     * Returns the experience that this player has accumulated.
-     */
-    @Getter
-    private long experience = 0;
-
-    /**
-     * The player's level, cached, so we don't have to recalculate it.
-     * -- GETTER --
-     * Accessor method for the player's level.
-     */
-    @Getter
-    private long level = 1;
-
-    /**
-     * Uuid of the player this construct points to.
-     * -- GETTER --
-     * Returns the uuid of the player this construct points to.
-     */
-    @Getter
     private final UUID uuid;
 
-    /**
-     * A pending party invite for this player.
-     * -- GETTER --
-     * Returns this player's pending party.
-     * -- SETTER --
-     * Sets a party as pending with this player.
-     */
-    @Setter
-    @Getter
-    private Party pendingParty = null;
-
-    /**
-     * The party, if any that this player belongs to.
-     * -- GETTER --
-     * Accessor method for this player's party.
-     * -- SETTER --
-     * Sets this player's party to the given party.
-     */
-    @Setter
-    @Getter
-    private Party party = null;
-
-    /**
-     * This player's combat class as a cached enum.
-     * -- GETTER --
-     * Accesses this player's combat class as an enum value.
-     */
-    @Getter
-    private Classes combatClass = Classes.NONE;
-
-    /**
-     * The player's combat class as an object. Used to handle attacks/abilities/defense etc.
-     */
-    private Class classObject = new NoneClass(this);
-
-    /**
-     * A reference to any active bosses that are fighting this player.
-     */
-    private CustomMob activeBoss = null;
-
-    /**
-     * This RpgPlayer object's Bukkit player object. Cached since it's requested quite often.
-     * -- GETTER --
-     * Gets the Bukkit version of this RpgPlayer.
-     */
-    @Getter
-    private final Player bukkitPlayer;
-
-    /**
-     * This RpgPlayer object's name. Cached since it's requested quite often.
-     * -- GETTER --
-     * Gets this player's name.
-     */
-    @Getter
-    private final String name;
-
-    /**
-     * The number of talent points spent on increasing max health.
-     * -- GETTER --
-     * Gets the number of points that this player has put into health.
-     * -- SETTER --
-     * Sets the number of health talent points allocated.
-     */
-    @Getter @Setter
-    private long healthTalentPoints = 0;
-
-    /**
-     * The number of talent points spent on increasing base damage.
-     * -- GETTER --
-     * Gets the number of points that this player has put into damage.
-     * -- SETTER --
-     * Sets the number of damage talent points allocated.
-     */
-    @Getter @Setter
-    private long damageTalentPoints = 0;
-
-    /**
-     * The chance that any strike could be a critical strike and deal double damage.
-     * -- GETTER --
-     * Gets the number of points allocated to critical strike chance.
-     * -- SETTER --
-     * Sets the number of points allocated to critical strike chance.
-     */
-    @Getter @Setter
-    private long critChanceTalentPoints = 0;
-
-    /**
-     * The amount of talent points that have been spent on increased movement speed.
-     * -- GETTER --
-     * Gets the number of points spent on moving faster.
-     * -- SETTER --
-     * Sets the number of points allocated to movement speed.
-     */
-    @Getter @Setter
-    private long movementSpeedTalentPoints = 0;
-
-    /**
-     * Default constructor for an RpgPlayer object. Caches the given Player object and grabs the name and UUID.
-     *
-     * @param p The player this construct points to.
-     */
-    public RpgPlayer (Player p) {
-        this.uuid = p.getUniqueId();
-        this.bukkitPlayer = p;
-        this.name = p.getName();
-        refresh();
-        Bukkit.getScheduler().runTaskLater(Utils.getPlugin(), this::refresh, 3 * 20);
+    public RpgPlayer(Player player) {
+        this(player.getUniqueId());
     }
 
-    /**
-     * Adds a list of artifacts to the list that this Player has already completed.
-     *
-     * @param collection The artifacts to tag onto the list.
-     */
-    public void addCollectedArtifacts (List<String> collection) {
-        artifactCollection.addAll(collection);
-        refresh();
+    RpgPlayer(UUID uuid) {
+        this.uuid = Objects.requireNonNull(uuid);
     }
 
-    /**
-     * Sends the given message to this player.
-     *
-     * @param message The message to send to this player.
-     */
-    public void sendMessage (String message) {
-        sendMessage(message, true);
+    private PlayerProfile profile() {
+        return RPGFramework.getInstance().players().find(uuid).orElseThrow(
+                () -> new IllegalStateException("Profile is not loaded for " + uuid));
     }
 
-    /**
-     * Sends the given message to this player.
-     *
-     * @param message The message to send to this player.
-     * @param prefix  Whether to include the RPG prefix or not.
-     */
-    public void sendMessage (String message, boolean prefix) {
-        if (prefix) getBukkitPlayer().sendMessage(MESSAGE_PREFIX + message);
-        else getBukkitPlayer().sendMessage(message);
-    }
+    public UUID getUuid() { return uuid; }
+    public String getName() { return profile().name(); }
+    public Player getPlayer() { return Bukkit.getPlayer(uuid); }
+    public Classes getCombatClass() { return profile().combatClass(); }
 
-    /**
-     * Sets the experience that this play has accumulated.
-     *
-     * @param xp The amount of xp that this player has gotten.
-     */
-    public void setExperience (long xp) {
-        experience = xp;
-        calculateLevel();
-        refresh();
-    }
-
-    /**
-     * Calculates this player's level and updates the cached value.
-     */
-    private void calculateLevel () {
-        long thirties = experience / 30;
-        long bar = 1;
-        long countingLevel = 0;
-        while (thirties > 0) {
-            thirties -= bar;
-            bar++;
-            if (thirties >= 0) countingLevel++;
-        }
-        level = countingLevel + 1;
-    }
-
-    /**
-     * Adds the given experience to this player.
-     *
-     * @param awarded The amount of awarded experience.
-     */
-    public void giveExperience (long awarded) {
-        long startingLevel = getLevel();
-        experience += awarded;
-        calculateLevel();
-        long finalLevel = getLevel();
-        if (startingLevel < finalLevel) levelUp();
-    }
-
-    /**
-     * Called whenever the player levels up.
-     */
-    private void levelUp () {
-        refresh();
-        getBukkitPlayer().playSound(getBukkitPlayer(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.5f, 1.0f);
-        sendMessage(ChatColor.GREEN + "You've leveled up! Level: " + getLevel());
-        sendMessage(ChatColor.DARK_AQUA + "You have " + getPointsUnallocated() + " unspent points!");
-    }
-
-    /**
-     * Gets the total number of available points for this RpgPlayer.
-     *
-     * @return The number of upgrade points available.
-     */
-    public int getPointsUnallocated () {
-        long total_points = getLevel();
-        total_points -= healthTalentPoints;
-        total_points -= damageTalentPoints;
-        total_points -= movementSpeedTalentPoints;
-        total_points -= critChanceTalentPoints;
-        return (int) total_points;
-    }
-
-    /**
-     * Attempts to allocate an additional point to health.
-     *
-     * @param field The field to allocate a talent point to.
-     */
-    public void allocatePoint (String field) {
-
-        if (getPointsUnallocated() <= 0) {
-            sendMessage(ChatColor.RED + "You do not have enough points to do that!");
+    public void joinClass(Classes combatClass) {
+        Player player = getPlayer();
+        if (player == null) {
+            profile().combatClass(combatClass);
             return;
         }
-
-        if (field.equalsIgnoreCase("health")) {
-            healthTalentPoints++;
-            sendMessage(ChatColor.GREEN + "You feel healthier now! " + StringUtils.convertHexCodes("#F454DA") + "+" + HEALTH_PER_POINT + " Health");
-        } else if (field.equalsIgnoreCase("damage")) {
-            damageTalentPoints++;
-            sendMessage(ChatColor.GREEN + "Your attacks hit harder! " + StringUtils.convertHexCodes("#D93747") + "+" + DAMAGE_PER_POINT + " Damage");
-        } else if (field.equalsIgnoreCase("movement_speed")) {
-            if (movementSpeedTalentPoints == MOVEMENT_SPEED_MAX_POINTS) {
-                sendMessage(ChatColor.RED + "You've reached the maximum level!");
-                return;
-            }
-            movementSpeedTalentPoints++;
-            sendMessage(ChatColor.GREEN + "You move faster! " + ChatColor.AQUA + "+" + (100 * MOVEMENT_SPEED_PER_POINT) + " Speed");
-        } else if (field.equalsIgnoreCase("critical_chance")) {
-            if (critChanceTalentPoints == CRIT_CHANCE_MAX_POINTS) {
-                sendMessage(ChatColor.RED + "You've reached the maximum level!");
-                return;
-            }
-            critChanceTalentPoints++;
-            sendMessage(ChatColor.GREEN + "Your strikes find more weak-spots! " + ChatColor.YELLOW + "+" + (CRIT_CHANCE_PER_POINT * 100) + " Critical Strike Chance");
-        }
-
-        refresh();
+        RPGFramework.getInstance().players().changeClass(player, combatClass);
     }
 
-    /**
-     * Resets any point allocations that this player has made.
-     */
-    public void resetPoints () {
-        healthTalentPoints = 0;
-        damageTalentPoints = 0;
-        movementSpeedTalentPoints = 0;
-        critChanceTalentPoints = 0;
-        sendMessage(ChatColor.GREEN + "You've reset all your base talent points.");
-        refresh();
+    public long getExperience() { return profile().experience(); }
+    public void setExperience(long experience) { profile().setExperience(experience); }
+    public void giveExperience(long awarded) { profile().addExperience(awarded); }
+    public int getPointsUnallocated() { return profile().unallocatedPoints(); }
+    public long getHealthTalentPoints() { return profile().talentPoints(Talent.HEALTH); }
+    public void setHealthTalentPoints(long value) { profile().setTalentPoints(Talent.HEALTH, value); }
+    public long getDamageTalentPoints() { return profile().talentPoints(Talent.DAMAGE); }
+    public void setDamageTalentPoints(long value) { profile().setTalentPoints(Talent.DAMAGE, value); }
+    public long getMovementSpeedTalentPoints() { return profile().talentPoints(Talent.SPEED); }
+    public void setMovementSpeedTalentPoints(long value) { profile().setTalentPoints(Talent.SPEED, value); }
+    public long getCritChanceTalentPoints() { return profile().talentPoints(Talent.CRIT_CHANCE); }
+    public void setCritChanceTalentPoints(long value) { profile().setTalentPoints(Talent.CRIT_CHANCE, value); }
+
+    public void addCollectedArtifacts(List<String> collection) {
+        collection.forEach(profile()::addArtifact);
     }
 
-    /**
-     * Determines how much of a health bonus this player should have. These are RPG numbers that are then scaled down.
-     *
-     * @return The bonus health that should be added onto the player's health.
-     */
-    private double healthBonus () {
-        return healthTalentPoints * HEALTH_PER_POINT;
+    public List<String> getCollectedArtifacts() {
+        return profile().artifacts().stream().sorted().toList();
     }
 
-    /**
-     * Determines how much of a damage bonus this player should have. These are RPG numbers that are then scaled down.
-     *
-     * @return The bonus damage that should be added onto the player's attacks.
-     */
-    private double damageBonus () {
-        return damageTalentPoints * DAMAGE_PER_POINT;
+    public void sendMessage(String message) {
+        Player player = getPlayer();
+        if (player != null) player.sendMessage(message);
     }
 
-    /**
-     * Refreshes the player's stats including stats gained from levels.
-     */ // todo: This method is too long.
-    private void refresh () {
-        if (!artifactCollection.isEmpty()) {
-            ItemManager itemManager = ItemManager.getInstance();
-            double healthMod = 0;
-            double damageMod = 0;
-            double armorMod = 0;
-            double toughnessMod = 0;
-            double attackSpeedMod = 0;
-            for (String a : artifactCollection) {
-                RpgItem item = itemManager.getRpgItem(a);
-                if (item.getSlot() != EquipmentSlots.ARTIFACT) continue;
-                healthMod += item.getHealth();
-                damageMod += item.getDamage();
-                armorMod += item.getArmor();
-                toughnessMod += item.getToughness();
-                attackSpeedMod += item.getAttackSpeed();
-            }
-            AttributeInstance healthInstance = bukkitPlayer.getAttribute(Attribute.GENERIC_MAX_HEALTH);
-            AttributeInstance damageInstance = bukkitPlayer.getAttribute(Attribute.GENERIC_ATTACK_DAMAGE);
-            AttributeInstance armorInstance = bukkitPlayer.getAttribute(Attribute.GENERIC_ARMOR);
-            AttributeInstance attackSpeed = bukkitPlayer.getAttribute(Attribute.GENERIC_ATTACK_SPEED);
-            AttributeInstance toughnessInstance = bukkitPlayer.getAttribute(Attribute.GENERIC_ARMOR_TOUGHNESS);
-            if (healthMod != 0 && healthInstance != null) {
-                healthInstance.removeModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_MAX_HEALTH, healthMod / 5.0, null));
-                healthInstance.addModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_MAX_HEALTH, healthMod / 5.0, null));
-            }
-            if (damageMod != 0 && damageInstance != null) { // todo: Requires more testing damage might be bugged or interacting funny.
-                damageInstance.removeModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ATTACK_DAMAGE, damageMod / 5.0, null));
-                damageInstance.addModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ATTACK_DAMAGE, damageMod / 5.0, null));
-            }
-            if (armorMod != 0 && armorInstance != null) {
-                armorInstance.removeModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ARMOR, armorMod, null));
-                armorInstance.addModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ARMOR, armorMod, null));
-            }
-            if (attackSpeedMod != 0 && attackSpeed != null) {
-                attackSpeed.removeModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ATTACK_SPEED, attackSpeedMod, null));
-                attackSpeed.addModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ATTACK_SPEED, attackSpeedMod, null));
-            }
-            if (toughnessMod != 0 && toughnessInstance != null) {
-                toughnessInstance.removeModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ARMOR_TOUGHNESS, toughnessMod, null));
-                toughnessInstance.addModifier(AttributeBuilder.attributeModifier(Attribute.GENERIC_ARMOR_TOUGHNESS, toughnessMod, null));
-            }
-            bukkitPlayer.setHealthScale(20);
-            PlayerManager.scaleRegen(bukkitPlayer, 1);
-        }
-        final double RPG_TO_MC_SCALAR = 5.0; // Scales RPG health/damage values to Mc attribute ones.
-        Player player = getBukkitPlayer();
-        AttributeModifier healthMod = new AttributeModifier(new UUID(100, 234), "", healthBonus() / RPG_TO_MC_SCALAR, AttributeModifier.Operation.ADD_NUMBER);
-        AttributeModifier damageMod = new AttributeModifier(new UUID(100, 235), "", damageBonus() / RPG_TO_MC_SCALAR, AttributeModifier.Operation.ADD_NUMBER);
-        AttributeModifier speedMod = new AttributeModifier(new UUID(100, 236), "", getMovementSpeedTalentPoints() * MOVEMENT_SPEED_PER_POINT, AttributeModifier.Operation.ADD_NUMBER);
-        AttributeInstance healthInstance = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
-        AttributeInstance damageInstance = player.getAttribute(Attribute.GENERIC_ATTACK_DAMAGE);
-        AttributeInstance speedInstance = player.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
-        if (healthInstance != null) {
-            Collection<AttributeModifier> modifiers = healthInstance.getModifiers();
-            if (!modifiers.isEmpty())
-                healthInstance.removeModifier(healthMod);
-            healthInstance.addModifier(healthMod);
-            player.setHealth(healthInstance.getValue());
-            player.setHealthScale(20);
-        } else {
-            RPGFramework.console("Attempted to update " + player.getName() + "'s health but GENERIC_MAX_HEALTH instance is null.", ChatColor.RED);
-        }
-        // todo: Abstract damage and speed.
-        if (damageInstance != null) {
-            Collection<AttributeModifier> modifiers = damageInstance.getModifiers();
-            if (!modifiers.isEmpty())
-                damageInstance.removeModifier(damageMod);
-            damageInstance.addModifier(damageMod);
-        } else {
-            RPGFramework.console("Attempted to update " + player.getName() + "'s damage but GENERIC_ATTACK_DAMAGE instance is null.", ChatColor.RED);
-        }
-        if (speedInstance != null) {
-            Collection<AttributeModifier> modifiers = speedInstance.getModifiers();
-            if (!modifiers.isEmpty())
-                speedInstance.removeModifier(speedMod);
-            speedInstance.addModifier(speedMod);
-        } else {
-            RPGFramework.console("Attempted to update " + player.getName() + "'s damage but GENERIC_MOVEMENT_SPEED instance is null.", ChatColor.RED);
+    public void sendMessage(String message, boolean prefix) {
+        sendMessage(prefix ? "[RPG] " + message : message);
+    }
+
+    public void resetPoints() {
+        for (Talent talent : Talent.values()) {
+            profile().setTalentPoints(talent, 0);
         }
     }
 
-    /**
-     * Gets a gear score for this player.
-     *
-     * @return The player's current gear score.
-     */ // todo: Consider RPGItem stats.
-    public int getGearScore () {
-        int runningScore = 0;
-        ItemStack[] collection = getBukkitPlayer().getInventory().getArmorContents();
+    public String getArchetype() { return profile().combatClass().name(); }
+    public boolean inCombat() { return false; }
 
-        for (ItemStack item: collection) {
-            if (item != null) {
-                if (item.getEnchantments().size() > 1) runningScore += 15;
-                try {
-                    if (Objects.requireNonNull(Objects.requireNonNull(item.getItemMeta()).getLore()).contains("Modified Vanilla")) {
-                        switch (item.getType()) {
-                            case LEATHER_BOOTS: case LEATHER_LEGGINGS: case LEATHER_CHESTPLATE: case LEATHER_HELMET: runningScore += 5; break;
-                            case CHAINMAIL_BOOTS: case CHAINMAIL_LEGGINGS: case CHAINMAIL_CHESTPLATE: case CHAINMAIL_HELMET: runningScore += 6; break;
-                            case GOLDEN_BOOTS: case GOLDEN_LEGGINGS: case GOLDEN_CHESTPLATE: case GOLDEN_HELMET: runningScore += 8; break;
-                            case IRON_BOOTS: case IRON_LEGGINGS: case IRON_CHESTPLATE: case IRON_HELMET: runningScore += 10; break;
-                            case DIAMOND_BOOTS: case DIAMOND_LEGGINGS: case DIAMOND_CHESTPLATE: case DIAMOND_HELMET: runningScore += 13; break;
-                            case NETHERITE_BOOTS: case NETHERITE_LEGGINGS: case NETHERITE_CHESTPLATE: case NETHERITE_HELMET: runningScore += 15; break;
-                        }
-                    } else runningScore += 20;
-                } catch (NullPointerException ignored) { }
-            }
-        }
-        return runningScore;
+    public void heal() {
+        Player player = getPlayer();
+        if (player == null) return;
+        var maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+        if (maxHealth != null) player.setHealth(maxHealth.getValue());
     }
 
-    /**
-     * Returns the ChatColor rarity of this player, based on gear score.
-     *
-     * @return ChatColor the color rarity of this player.
-     */
-    public ChatColor getPlayerRarity () {
-        int gearScore = getGearScore();
-
-        if (gearScore <= 100) return ChatColor.WHITE; // todo: Utilize Rarity hex colors.
-        else if (gearScore <= 200) return ChatColor.GREEN;
-        else if (gearScore <= 300) return ChatColor.BLUE;
-        else if (gearScore <= 400) return ChatColor.GOLD;
-        else if (gearScore <= 500) return ChatColor.LIGHT_PURPLE;
-        else return ChatColor.RED;
-    }
-
-    /**
-     * Drops the entire player's inventory at their current location.
-     */
-    public void dropAll () {
-        Player player = getBukkitPlayer();
-        World world = player.getWorld();
-        for (ItemStack e: player.getInventory()) {
-            try {
-                world.dropItem(player.getLocation(), e);
-            } catch (IllegalArgumentException ignored) { }
-        }
-        player.getInventory().clear();
-    }
-
-    /**
-     * Accessor method for this player's current health.
-     *
-     * @return This player's health.
-     */
-    public double getCurrentHealth () {
-        return getBukkitPlayer().getHealth();
-    }
-
-    /**
-     * Accessor method for a formatted version of this player's current health.
-     *
-     * @return A nicely colored string for this player's health.
-     */
-    public String getFormattedHealth () {
-        double max = getMaxHealth();
-        double current = getBukkitPlayer().getHealth();
-
-        ChatColor prefix = ChatColor.GREEN;
-        if (current / max < 0.75) prefix = ChatColor.YELLOW;
-        else if (current / max < 0.50) prefix = ChatColor.RED;
-
-        return prefix + "" + current;
-    }
-
-    /**
-     * Accessor method for the player's current damage. This is heavily influenced by equipment. This is the scaled down
-     * damage value.
-     *
-     * @return This player's damage.
-     */
-    public double getCurrentDamage () {
-        AttributeInstance instance = bukkitPlayer.getAttribute(Attribute.GENERIC_ATTACK_DAMAGE);
-        if (instance == null) return 0;
-        return instance.getValue();
-    }
-
-    /**
-     * Assigns a new class object to this RpgPlayer based upon the given enum value.
-     *
-     * @param c The class that this player will join.
-     */
-    public void joinClass (Classes c) {
-        this.combatClass = c;
-        switch (c) {
-            case BARD -> classObject = new BardClass(this);
-            case ASSASSIN -> classObject = new AssassinClass(this);
-            case BERSERKER -> classObject = new BerserkerClass(this);
-            case PALADIN -> classObject = new PaladinClass(this);
-            case PYROMANCER -> classObject = new PyromancerClass(this);
-            case NONE -> classObject = new NoneClass(this);
+    public void heal(double amount) {
+        Player player = getPlayer();
+        if (player == null || amount <= 0) return;
+        var maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+        if (maxHealth != null) {
+            player.setHealth(Math.min(maxHealth.getValue(), player.getHealth() + amount));
         }
     }
 
-    /**
-     * A niche system to classify classes between fighters and casters.
-     *
-     * @return Which parent class archetype this player's current class fits in.
-     */
-    public String getArchetype () {
-        return switch (combatClass) {
-            case ASSASSIN, /*GLADIATOR, MARKSMEN,*/ BERSERKER -> "Fighter";
-            case NONE -> "None";
-            default -> "Caster";
-        };
+    public void resetCooldowns() {
+        // Compatibility no-op. Cooldowns now belong to the systems that own the abilities.
     }
-
-    /**
-     * Passes an interact event done by this player onto the contained combat class object.
-     *
-     * @param event The player interact event we're considering.
-     */ // todo: Should we do this?
-    public void onInteract (PlayerInteractEvent event) {
-        classObject.onInteract(event);
-    }
-
-    /**
-     * Checks whether this player has a cheat death available from their class.
-     *
-     * @return True if the player has a revive mechanic available, otherwise false.
-     */
-    public boolean revive () {
-        return !classObject.onDeath();
-    }
-
-    /**
-     * Used to verify whether a player is in combat.
-     *
-     * @return Whether the player has been attacked in the last bit of time.
-     */
-    public boolean inCombat () {
-        return System.currentTimeMillis() - fighting < TIME_UNTIL_OUT_OF_COMBAT;
-    }
-
-    /**
-     * Called whenever this player gets attacked by another entity.
-     *
-     * @param event The EntityDamageByEntityEvent to consider.
-     */ // todo: Should we do this?
-    public void damaged (EntityDamageEvent event) {
-        classObject.damaged(event);
-        if (event instanceof EntityDamageByEntityEvent damageByEntityEvent) {
-            fighting = System.currentTimeMillis();
-            enteringCombat();
-            lastHitBy = damageByEntityEvent.getDamager();
-        }
-    }
-
-    /**
-     * Called whenever this player attacks another entity.
-     *
-     * @param event The EntityDamageByEntityEvent to consider.
-     */ // todo: Should we do this?
-    public void attacker (EntityDamageByEntityEvent event) {
-        fighting = System.currentTimeMillis();
-        enteringCombat();
-        classObject.attack(event);
-        // todo: Move this elsewhere, using AdvancedDamageEvent.
-        double roll = new Random().nextDouble();
-        if (roll < critChanceTalentPoints * CRIT_CHANCE_PER_POINT) event.setDamage(event.getDamage() * 2.0);
-        lastHitBy = event.getEntity();
-    }
-
-    /**
-     * Called once every 20 seconds. Handles ongoing potion effects for classes like assassin, as well as does combat
-     * checking.
-     */
-    public void passive () {
-        try {
-            classObject.passive();
-            JavaPlugin plugin = Utils.getPlugin();
-            Bukkit.getScheduler().runTaskLater(plugin, this::passive, 20*20);
-            if (!inCombat() && !appliedOutCombat)
-                leaveCombat();
-        } catch (Exception ignored) { } // This can sometimes occur if a passive disconnects from a Player object. TODO: Handle this error better.
-    }
-
-    /**
-     * Called whenever a player is attacked while in combat.
-     */
-    public void enteringCombat () {
-        if (appliedOutCombat)
-            getBukkitPlayer().sendMessage(ChatColor.RED + "Entering Combat");
-        PlayerManager.scaleRegen(getBukkitPlayer(), 1.0);
-        appliedOutCombat = false;
-    }
-
-    /**
-     * Called periodically when a player is not in combat.
-     */
-    public void leaveCombat () {
-        if (!appliedOutCombat) {
-            getBukkitPlayer().sendMessage(ChatColor.GREEN + "Left Combat");
-            getBukkitPlayer().playSound(getBukkitPlayer(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.0f, 1.0f);
-        }
-        appliedOutCombat = true;
-        PlayerManager.scaleRegen(getBukkitPlayer(), 0.25);
-    }
-
-    /**
-     * A Utility method to obtain the max health of this RpgPlayer.
-     *
-     * @return The maximum health of this player.
-     */
-    public double getMaxHealth () {
-        AttributeInstance instance = getBukkitPlayer().getAttribute(Attribute.GENERIC_MAX_HEALTH);
-        if (instance == null) return 20.0;
-        return instance.getValue();
-    }
-
-    /**
-     * Heals the player by the given amount.
-     *
-     * @param amount The amount to heal the player by.
-     */
-    public void heal (double amount) {
-        getBukkitPlayer().setHealth(Math.min(getBukkitPlayer().getHealth() + amount, getMaxHealth()));
-    }
-
-    /**
-     * Heals the player to max.
-     */
-    public void heal () {
-        getBukkitPlayer().setHealth(getMaxHealth());
-    }
-
-    /**
-     * Resets all the cooldowns that are in this RpgPlayer.
-     */
-    public void resetCooldowns () {
-        Class tmp = classObject;
-        if (tmp instanceof AbstractClass rpg)
-            for (Cooldown cd : rpg.getCooldowns())
-                cd.setComplete();
-    }
-
-    /**
-     * Sets the active boss.
-     *
-     * @param boss The boss to assign to this player.
-     */
-    public void setBoss (CustomMob boss) {
-        if (party != null) party.setBoss(boss);
-        activeBoss = boss;
-    }
-
-    /**
-     * An accessor method for the boss that is actively fighting this player.
-     *
-     * @return The boss actively fighting this Party.
-     */
-    public CustomMob getActiveBossUnsafe () {
-        if (party != null) {
-            CustomMob candidate = party.getActiveBossUnsafe();
-            if (candidate != null)
-                return candidate;
-        }
-        return activeBoss;
-    }
-
-    /**
-     * An accessor method for the boss that is actively fighting this player. Will validate the boss before returning.
-     *
-     * @return The boss actively fighting this Party.
-     */
-    public CustomMob getActiveBoss () {
-        if (party != null) {
-            CustomMob candidate = party.getActiveBoss();
-            if (candidate != null)
-                return candidate;
-        }
-        if (activeBoss != null)
-            if (activeBoss.isSpawned())
-                if (!activeBoss.getEntity().isValid() || activeBoss.getEntity().isDead())
-                    activeBoss = null;
-        return activeBoss;
-    }
-
-    /**
-     * A helpful utility method to wrangle all the friendly caster targets. i.e. {@link this} and if present, all party
-     * members.
-     *
-     * @return A list of friendly casting targets.
-     */
-    public List<RpgPlayer> friendlyCasterTargets () {
-        List<RpgPlayer> toReturn = new ArrayList<>();
-        if (party != null) toReturn.addAll(party.getRpgPlayers());
-        else toReturn.add(this);
-        return toReturn;
-    }
-
-    /**
-     * A helpful utility method to wrangle all nearby enemy caster targets.
-     *
-     * @param distance The distance from this RpgPlayer to look for targets.
-     * @return A list of nearby enemy casting targets.
-     */
-    public List<LivingEntity> nearbyEnemyCasterTargets (double distance) {
-        return nearbyEnemyCasterTargets(distance, distance, distance);
-    }
-
-    /**
-     * A helpful utility method to wrangle all nearby enemy caster targets.
-     *
-     * @param dx The distance in the x direction to look for nearby targets.
-     * @param dy The distance in the y direction to look for nearby targets.
-     * @param dz The distance in the z direction to look for nearby targets.
-     * @return A list of nearby enemy casting targets.
-     */
-    public List<LivingEntity> nearbyEnemyCasterTargets (double dx, double dy, double dz) {
-        List<LivingEntity> toReturn = new ArrayList<>();
-        List<RpgPlayer> friendlies = friendlyCasterTargets();
-        List<LivingEntity> friendlyEntities = new ArrayList<>();
-        for (RpgPlayer rpg : friendlies)
-            friendlyEntities.add(rpg.getBukkitPlayer());
-        List<Entity> entities = getBukkitPlayer().getNearbyEntities(dx, dy, dz);
-        for (Entity e : entities)
-            if (e instanceof LivingEntity le)
-                if (!friendlyEntities.contains(le))
-                    toReturn.add(le);
-        return toReturn;
-    }
-
-    /**
-     * Adds the given potion effect to this player.
-     *
-     * @param type The type of effect to add.
-     * @param dur  The duration to add this effect.
-     * @param lvl  The level to apply this effect at. (Not amplifier!)
-     */
-    public void addPotionEffect (PotionEffectType type, int dur, int lvl) {
-        addPotionEffect(type, dur, lvl, false, false);
-    }
-
-    /**
-     * Adds the given potion effect to this player.
-     *
-     * @param type    The type of effect to add.
-     * @param dur     The duration to add this effect.
-     * @param lvl     The level to apply this effect at. (Not amplifier!)
-     * @param ambient Whether the particles are ambient or not.
-     * @param hide    Should the particles be hidden.
-     */
-    public void addPotionEffect (PotionEffectType type, int dur, int lvl, boolean ambient, boolean hide) {
-        getBukkitPlayer().addPotionEffect(new PotionEffect(type, dur, lvl - 1, ambient, hide));
-    }
-
-    /**
-     * Removes the given potion effects from this RpgPlayer.
-     *
-     * @param effects The effects to remove from this RpgPlayer.
-     */
-    public void cleanseEffects (PotionEffectType... effects) {
-        if (effects == null) return;
-        Player player = getBukkitPlayer();
-        for (PotionEffectType type : effects)
-            player.removePotionEffect(type);
-    }
-
-    //TODO: Implement the damage bonus of the bow
 }

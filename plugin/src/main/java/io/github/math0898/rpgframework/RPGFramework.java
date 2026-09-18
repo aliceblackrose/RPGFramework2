@@ -1,140 +1,95 @@
 package io.github.math0898.rpgframework;
 
-import io.github.math0898.rpgframework.commands.*;
-import io.github.math0898.rpgframework.commands.stats.StatsCommand;
+import io.github.math0898.rpgframework.classes.ClassService;
+import io.github.math0898.rpgframework.commands.ClassesCommand;
+import io.github.math0898.rpgframework.commands.GiveCommand;
+import io.github.math0898.rpgframework.commands.PartyCommand;
+import io.github.math0898.rpgframework.commands.RpgCommand;
+import io.github.math0898.rpgframework.commands.StatsCommand;
 import io.github.math0898.rpgframework.damage.AdvancedDamageHandler;
-import io.github.math0898.rpgframework.enemies.MobManager;
-import io.github.math0898.rpgframework.hooks.HookManager;
 import io.github.math0898.rpgframework.items.ItemManager;
+import io.github.math0898.rpgframework.items.ItemRegistry;
 import io.github.math0898.rpgframework.parties.PartyManager;
-import io.github.math0898.rpgframework.systems.GodEventListener;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.event.Listener;
-import org.bukkit.plugin.java.JavaPlugin;
-import sugaku.rpg.framework.RPGEventListener;
-import sugaku.rpg.mobs.teir1.eiryeras.EiryerasBoss;
-import sugaku.rpg.mobs.teir1.feyrith.FeyrithBoss;
-
+import io.github.math0898.rpgframework.parties.PartyService;
+import io.github.math0898.rpgframework.player.PlayerLifecycleListener;
+import io.github.math0898.rpgframework.player.PlayerService;
+import io.github.math0898.rpgframework.player.YamlProfileRepository;
+import java.util.List;
+import java.util.Objects;
 import java.util.logging.Level;
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
 
-/**
- * The main class for the RPG Framework. A few methods and what not will be declared here for calling from other plugins
- * that are a part of the RPG suite.
- *
- * @author Sugaku
- */
-public final class RPGFramework extends JavaPlugin implements Listener {
+@SuppressWarnings("deprecation")
+public final class RPGFramework extends JavaPlugin {
+    private static RPGFramework instance;
+    private YamlProfileRepository profileRepository;
+    private PlayerService playerService;
+    private ClassService classService;
+    private PartyService partyService;
+    private ItemRegistry itemRegistry;
 
-    /**
-     * A pointer to the plugin instance.
-     */
-    public static RPGFramework plugin = null;
-
-    /**
-     * Is holographic displays enabled on the server?
-     */
-    public static boolean useHolographicDisplays = false;
-
-    /**
-     * Is decent holograms on the server?
-     */
-    public static boolean useDecentHolograms = false;
-
-    /**
-     * The ItemManager being used with this RPGFramework instance.
-     */
-    @Deprecated
-    public static ItemManager itemManager;
-
-    /**
-     * This method sends a message to the console and infers the level it should be sent at.
-     *
-     * @param message The message to send to the console.
-     * @param color The main color of the message being sent.
-     */
-    public static void console (String message, ChatColor color) {
-        switch (color) {
-            case RED -> console(message, color, Level.SEVERE);
-            case YELLOW -> console(message, color, Level.WARNING);
-            default -> console(message, color, Level.INFO);
-        }
-    }
-
-    /**
-     * This method sends a message to the console.
-     *
-     * @param message The message to send to the console.
-     * @param color The main color of the message being sent.
-     * @param lvl The level that the message should be sent at.
-     */
-    public static void console (String message, ChatColor color, Level lvl) {
-        plugin.getLogger().log(lvl, color + message);
-    }
-
-    /**
-     * An accessor method to the active Plugin instance.
-     *
-     * @return The active Plugin instance.
-     */
-    public static RPGFramework getInstance () {
-        return plugin;
-    }
-
-    /**
-     * Called on enable. Just the normal things such as loading the config, registering listeners, initializing methods.
-     */
     @Override
-    public void onEnable () {
-        long startTime = System.currentTimeMillis();
-        plugin = this;
+    public void onEnable() {
+        instance = this;
+        profileRepository = new YamlProfileRepository(this);
+        classService = new ClassService();
+        playerService = new PlayerService(this, profileRepository, classService);
+        partyService = new PartyService();
+        itemRegistry = new ItemRegistry(this);
 
-        //Register damage listeners
-        Bukkit.getPluginManager().registerEvents(new AdvancedDamageHandler(), this);
-        Bukkit.getPluginManager().registerEvents(new GodEventListener(), this); // todo remove me!
-        PartyManager.init();
-        PlayerManager.init();
-        DataManager.getInstance();
+        PlayerManager.bind(playerService);
+        DataManager.bind(profileRepository, playerService);
+        PartyManager.bind(partyService);
+        ItemManager.bind(itemRegistry);
+
+        itemRegistry.reload();
+        registerListeners();
         registerCommands();
-
-        //Establish hooks
-        HookManager.getInstance();
-        useHolographicDisplays = Bukkit.getPluginManager().isPluginEnabled("HolographicDisplays");
-        useDecentHolograms = Bukkit.getPluginManager().isPluginEnabled("DecentHolograms");
-        if (!useHolographicDisplays && !useDecentHolograms) {
-            console("Holographic Displays nor Decent Holograms was not found.", ChatColor.YELLOW);
-            console("This is non fatal error however you will not see damage numbers when you hit mobs.", ChatColor.YELLOW);
-        }
-        itemManager = ItemManager.getInstance();
-        MobManager.getInstance();
-
-        ItemManager.getInstance();
-
-        /* Begin block copied from sugaku.rpg.main */
-        //Registering events TODO: Move this somewhere?
-        Bukkit.getPluginManager().registerEvents(new RPGEventListener(), plugin);
-        Bukkit.getPluginManager().registerEvents(new EiryerasBoss(), plugin);
-        Bukkit.getPluginManager().registerEvents(new FeyrithBoss(), plugin);
-
-        console("Plugin enabled! " + ChatColor.DARK_GRAY + "Took: " + (System.currentTimeMillis() - startTime) + "ms", ChatColor.GREEN);
+        Bukkit.getOnlinePlayers().forEach(playerService::load);
+        getLogger().info("RPGFramework enabled on Paper 26.2 / Java 25.");
     }
 
-    /**
-     * Registers all the commands in a simple group.
-     */
-    private void registerCommands () {
-        console("Registering commands.", ChatColor.GRAY);
-        new Tutorial();
-        new Updates();
-        new Classes();
-        new SummonRPG();
-        new GiveCommand();
-        new StatsCommand();
-        new PartyCommand();
-        new DebugCommand();
-        new EditorCommand();
-        new ArtifactCommand();
-        new DungeonCreateCommand();
-        console("Commands registered.", ChatColor.GREEN);
+    @Override
+    public void onDisable() {
+        if (playerService != null) playerService.saveAllBlocking();
+        if (profileRepository != null) profileRepository.close();
+        ItemManager.unbind();
+        PartyManager.unbind();
+        DataManager.unbind();
+        PlayerManager.unbind();
+        instance = null;
+    }
+
+    private void registerListeners() {
+        var manager = Bukkit.getPluginManager();
+        manager.registerEvents(new PlayerLifecycleListener(playerService), this);
+        manager.registerEvents(new AdvancedDamageHandler(), this);
+        manager.registerEvents(PartyManager.listener(), this);
+    }
+
+    private void registerCommands() {
+        registerCommand("rpg", "RPGFramework root command", List.of(), new RpgCommand(this));
+        registerCommand("classes", "Select or inspect your RPG class", List.of(), new ClassesCommand(playerService));
+        registerCommand("party", "Create and manage RPG parties", List.of(), new PartyCommand(partyService));
+        registerCommand("rpg-give", "Give registered RPG items", List.of(), new GiveCommand(itemRegistry));
+        registerCommand("stats", "Display RPG stats", List.of(), new StatsCommand(playerService));
+        registerCommand("rpg-debug", "RPGFramework diagnostics", List.of(), new RpgCommand(this));
+        registerCommand("artifact", "RPG artifact status", List.of(), new RpgCommand(this));
+        registerCommand("tutorial", "RPG help", List.of(), new RpgCommand(this));
+        registerCommand("updates", "RPG framework version information", List.of(), new RpgCommand(this));
+    }
+
+    public static RPGFramework getInstance() {
+        return Objects.requireNonNull(instance, "RPGFramework is not enabled");
+    }
+
+    public PlayerService players() { return Objects.requireNonNull(playerService); }
+    public ClassService classes() { return Objects.requireNonNull(classService); }
+    public PartyService parties() { return Objects.requireNonNull(partyService); }
+    public ItemRegistry items() { return Objects.requireNonNull(itemRegistry); }
+
+    public void log(Level level, String message, Throwable throwable) {
+        getLogger().log(level, message, throwable);
     }
 }

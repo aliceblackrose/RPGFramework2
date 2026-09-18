@@ -1,33 +1,33 @@
 package io.github.math0898.rpgframework;
 
-public class Cooldown { // todo: Javadoc.
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Objects;
 
-    private final float duration;
+/**
+ * Monotonic-by-contract cooldown value based on wall-clock instants.
+ */
+public final class Cooldown {
+    private Instant readyAt = Instant.EPOCH;
 
-    private long startTime;
-
-    private boolean complete = false;
-
-    public Cooldown(float duration) {
-        startTime = System.currentTimeMillis();
-        this.duration = duration;
+    public boolean ready() {
+        return !Instant.now().isBefore(readyAt);
     }
 
-    public float getRemaining() { return duration - Math.floorDiv(System.currentTimeMillis() - startTime, 1000); }
-
-    /**
-     * Has the cooldown finished its duration and is the ability tied to this cooldown ready for use again.
-     *
-     * @return True if the cooldown duration has elapsed.
-     */
-    public boolean isComplete () {
-        return ((getRemaining() < 0) || complete);
+    public Duration remaining() {
+        var remaining = Duration.between(Instant.now(), readyAt);
+        return remaining.isNegative() ? Duration.ZERO : remaining;
     }
 
-    public void restart() {
-        startTime = System.currentTimeMillis();
-        complete = false;
+    public void start(Duration duration) {
+        Objects.requireNonNull(duration, "duration");
+        if (duration.isNegative()) {
+            throw new IllegalArgumentException("duration must not be negative");
+        }
+        readyAt = Instant.now().plus(duration);
     }
 
-    public void setComplete() { complete = true; }
+    public void reset() {
+        readyAt = Instant.EPOCH;
+    }
 }
