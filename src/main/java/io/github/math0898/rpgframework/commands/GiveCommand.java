@@ -38,7 +38,7 @@ public final class GiveCommand implements BasicCommand {
             return;
         }
 
-        var stack = definition.getItemStack();
+        var stack = definition.createItemStack();
         target.getInventory().addItem(stack).values()
                 .forEach(leftover -> target.getWorld().dropItemNaturally(target.getLocation(), leftover));
         CommandSupport.info(source, "Gave " + definition.id() + " to " + target.getName() + ".");
