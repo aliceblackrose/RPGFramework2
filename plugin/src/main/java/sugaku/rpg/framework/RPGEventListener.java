@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 
-//import static sugaku.rpg.framework.menus.ForgeManager.forgeClose;
 import static io.github.math0898.rpgframework.RPGFramework.console;
 import static org.bukkit.event.entity.EntityDamageEvent.DamageCause.*;
 import static sugaku.rpg.framework.items.ItemsManager.updateArmor;
@@ -54,10 +53,7 @@ public class RPGEventListener implements Listener {
 
         if (clicked == null) return;
 
-        //If the player clicked on an armor slot we should update special effects
-//        if (e.getSlotType() == InventoryType.SlotType.ARMOR) Bukkit.getServer().getScheduler().runTask(main.plugin, () -> updateEffects(Bukkit.getPlayer(e.getWhoClicked().getName())));
-//        else if (open.getTitle().equals(ForgeManager.title)) ForgeManager.forgeClicked(e);
-        /*else*/ if (open.getTitle().startsWith(ClassesManager.title)) ClassesManager.classClicked(e);
+        if (open.getTitle().startsWith(ClassesManager.title)) ClassesManager.classClicked(e);
     }
 
     /**
@@ -69,8 +65,6 @@ public class RPGEventListener implements Listener {
         RpgPlayer rpgPlayer = new RpgPlayer(e.getPlayer());
         PlayerManager.addPlayer(rpgPlayer);
         PlayerManager.scaleHealth(e.getPlayer());
-        // io.github.math0898.rpgframework.PlayerManager.onJoin()
-//        Bukkit.getServer().getScheduler().runTaskLater(main.plugin, () -> rpgPlayer.heal(), 5);
     }
 
     /**
@@ -141,16 +135,6 @@ public class RPGEventListener implements Listener {
             console("UUID: " + event.getPlayer().getUniqueId(), ChatColor.RED, Level.SEVERE);
         }
 
-//        if (event.getAction() == Action.RIGHT_CLICK_BLOCK && Objects.requireNonNull(event.getClickedBlock()).getType() == Material.ANVIL) {
-//
-//            Block blockClicked = event.getClickedBlock();
-//            Player player = event.getPlayer();
-
-//            if (blockClicked.getWorld().getBlockAt(blockClicked.getX(), blockClicked.getY() - 1, blockClicked.getZ()).getType() == Material.NETHERITE_BLOCK) {
-//                event.setCancelled(true);
-//                ForgeManager.forgeMenu(player);
-//            }
-//        }
     }
 
     /**
@@ -179,13 +163,6 @@ public class RPGEventListener implements Listener {
         if (event.getExhaustionReason() == EntityExhaustionEvent.ExhaustionReason.REGEN) PlayerManager.hunger(event);
     }
 
-    /**
-     * Called when an inventory is closed.
-     */
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-//        if (event.getPlayer().getOpenInventory().getTitle().equals(ForgeManager.title)) forgeClose(event);
-    }
 
     /**
      * A small helper method to check if an item is armor.

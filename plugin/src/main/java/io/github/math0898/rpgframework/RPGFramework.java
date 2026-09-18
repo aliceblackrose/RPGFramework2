@@ -41,11 +41,6 @@ public final class RPGFramework extends JavaPlugin implements Listener {
      */
     public static boolean useDecentHolograms = false;
 
-    /**
-     * The ItemManager being used with this RPGFramework instance.
-     */
-    @Deprecated
-    public static ItemManager itemManager;
 
     /**
      * This method sends a message to the console and infers the level it should be sent at.
@@ -91,7 +86,7 @@ public final class RPGFramework extends JavaPlugin implements Listener {
 
         //Register damage listeners
         Bukkit.getPluginManager().registerEvents(new AdvancedDamageHandler(), this);
-        Bukkit.getPluginManager().registerEvents(new GodEventListener(), this); // todo remove me!
+        Bukkit.getPluginManager().registerEvents(new GodEventListener(), this);
         PartyManager.init();
         PlayerManager.init();
         DataManager.getInstance();
@@ -105,13 +100,10 @@ public final class RPGFramework extends JavaPlugin implements Listener {
             console("Holographic Displays nor Decent Holograms was not found.", ChatColor.YELLOW);
             console("This is non fatal error however you will not see damage numbers when you hit mobs.", ChatColor.YELLOW);
         }
-        itemManager = ItemManager.getInstance();
+        ItemManager.getInstance();
         MobManager.getInstance();
 
-        ItemManager.getInstance();
-
-        /* Begin block copied from sugaku.rpg.main */
-        //Registering events TODO: Move this somewhere?
+        // Register legacy listeners still required by the current mob/event implementation.
         Bukkit.getPluginManager().registerEvents(new RPGEventListener(), plugin);
         Bukkit.getPluginManager().registerEvents(new EiryerasBoss(), plugin);
         Bukkit.getPluginManager().registerEvents(new FeyrithBoss(), plugin);

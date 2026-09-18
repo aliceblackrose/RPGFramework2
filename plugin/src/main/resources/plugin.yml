@@ -26,11 +26,6 @@ commands:
   rpg-give:
     description: "Gives custom rpg items to players."
     permission: "rpg.admin"
-  reputation:
-    permission: rpg.admin
-  rpg:
-    description: "A root alias for a number of commands."
-    permission: "rpg.player"
   summonrpg:
     description: "Summons RPG mobs into the world. Used by admins and for testing."
     permission: "rpg.admin"
