@@ -1,13 +1,15 @@
 package io.github.math0898.rpgframework.items;
 
 import io.github.math0898.rpgframework.Rarity;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 public final class RpgItem {
     private final String id;
+    private final String displayName;
+    private final Material material;
     private final Rarity rarity;
     private final EquipmentSlots slot;
     private final int health;
@@ -21,6 +23,8 @@ public final class RpgItem {
 
     RpgItem(
             String id,
+            String displayName,
+            Material material,
             Rarity rarity,
             EquipmentSlots slot,
             int health,
@@ -32,9 +36,11 @@ public final class RpgItem {
             WeaponType weaponType,
             Supplier<ItemStack> factory
     ) {
-        this.id = Objects.requireNonNull(id);
-        this.rarity = Objects.requireNonNull(rarity);
-        this.slot = Objects.requireNonNull(slot);
+        this.id = Objects.requireNonNull(id, "id");
+        this.displayName = Objects.requireNonNull(displayName, "displayName");
+        this.material = Objects.requireNonNull(material, "material");
+        this.rarity = Objects.requireNonNull(rarity, "rarity");
+        this.slot = Objects.requireNonNull(slot, "slot");
         this.health = health;
         this.damage = damage;
         this.armor = armor;
@@ -42,54 +48,117 @@ public final class RpgItem {
         this.attackSpeed = attackSpeed;
         this.armorType = armorType;
         this.weaponType = weaponType;
-        this.factory = Objects.requireNonNull(factory);
+        this.factory = Objects.requireNonNull(factory, "factory");
     }
 
     public String id() {
         return id;
     }
 
+    public String displayName() {
+        return displayName;
+    }
+
+    public Material material() {
+        return material;
+    }
+
     public Rarity rarity() {
         return rarity;
     }
 
-    public EquipmentSlots getSlot() {
+    public EquipmentSlots slot() {
         return slot;
     }
 
-    public int getHealth() {
+    public int health() {
         return health;
     }
 
-    public int getDamage() {
+    public int damage() {
         return damage;
     }
 
-    public double getArmor() {
+    public double armor() {
         return armor;
     }
 
-    public double getToughness() {
+    public double toughness() {
         return toughness;
     }
 
-    public double getAttackSpeed() {
+    public double attackSpeed() {
         return attackSpeed;
     }
 
-    public ArmorTypes getArmorType() {
+    public ArmorTypes armorType() {
         return armorType;
     }
 
-    public WeaponType getWeaponType() {
+    public WeaponType weaponType() {
         return weaponType;
     }
 
-    public int getGearScore() {
-        return (int) (health + (damage * 5.0) + (armor * 2.0) + (rarity.ordinal() * 10.0));
+    public int gearScore() {
+        double score = Math.max(0.0, health)
+                + (Math.max(0.0, damage) * 5.0)
+                + (Math.max(0.0, armor) * 2.0)
+                + Math.max(0.0, toughness)
+                + (rarity.ordinal() * 10.0);
+        return (int) Math.min(Integer.MAX_VALUE, Math.round(score));
     }
 
-    public ItemStack getItemStack() {
+    public ItemStack createItemStack() {
         return factory.get();
+    }
+
+    @Deprecated(forRemoval = false)
+    public EquipmentSlots getSlot() {
+        return slot();
+    }
+
+    @Deprecated(forRemoval = false)
+    public int getHealth() {
+        return health();
+    }
+
+    @Deprecated(forRemoval = false)
+    public int getDamage() {
+        return damage();
+    }
+
+    @Deprecated(forRemoval = false)
+    public double getArmor() {
+        return armor();
+    }
+
+    @Deprecated(forRemoval = false)
+    public double getToughness() {
+        return toughness();
+    }
+
+    @Deprecated(forRemoval = false)
+    public double getAttackSpeed() {
+        return attackSpeed();
+    }
+
+    @Deprecated(forRemoval = false)
+    public ArmorTypes getArmorType() {
+        return armorType();
+    }
+
+    @Deprecated(forRemoval = false)
+    public WeaponType getWeaponType() {
+        return weaponType();
+    }
+
+    @Deprecated(forRemoval = false)
+    public int getGearScore() {
+        return gearScore();
+    }
+
+    @Deprecated(forRemoval = false)
+    public ItemStack getItemStack() {
+        return createItemStack();
     }
 }

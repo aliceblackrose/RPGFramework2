@@ -1,6 +1,6 @@
 package io.github.math0898.rpgframework.items;
 
-import java.io.File;
+import io.github.math0898.rpgframework.Rarity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -21,7 +21,7 @@ public final class ItemManager {
     }
 
     public static void bind(ItemRegistry itemRegistry) {
-        registry = Objects.requireNonNull(itemRegistry);
+        registry = Objects.requireNonNull(itemRegistry, "itemRegistry");
     }
 
     public static void unbind() {
@@ -29,11 +29,13 @@ public final class ItemManager {
     }
 
     public void awardItem(Player player, String name) {
+        Objects.requireNonNull(player, "player");
         RpgItem item = requireRegistry().find(name).orElse(null);
         if (item == null) {
             return;
         }
-        ItemStack stack = item.getItemStack();
+
+        ItemStack stack = item.createItemStack();
         player.getInventory().addItem(stack).values()
                 .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
     }
@@ -43,17 +45,11 @@ public final class ItemManager {
     }
 
     public ItemStack getItem(String name) {
-        return requireRegistry().find(name).map(RpgItem::getItemStack).orElse(null);
+        return requireRegistry().find(name).map(RpgItem::createItemStack).orElse(null);
     }
 
     public String findRpgItem(ItemStack item) {
-        for (String id : requireRegistry().ids()) {
-            ItemStack candidate = getItem(id);
-            if (candidate != null && candidate.isSimilar(item)) {
-                return id;
-            }
-        }
-        return null;
+        return requireRegistry().identify(item).map(RpgItem::id).orElse(null);
     }
 
     public RpgItem getRpgItem(String name) {
@@ -64,31 +60,20 @@ public final class ItemManager {
         return requireRegistry().find(name).isPresent();
     }
 
-    public void passives() {
-        // Passive item effects are now expected to be event driven by the item that owns them.
-    }
-
-    public void parseFiles(File[] files) {
-        requireRegistry().reload();
-    }
-
     public int rateItem(ItemStack item) {
-        String id = findRpgItem(item);
-        RpgItem rpgItem = id == null ? null : getRpgItem(id);
-        return rpgItem == null ? 0 : rpgItem.getGearScore();
-    }
-
-    public void replaceRecipies() {
-        // Intentionally no-op; destructive vanilla recipe replacement was removed.
+        return requireRegistry().identify(item).map(RpgItem::gearScore).orElse(0);
     }
 
     public static String increaseRarity(String value) {
-        Objects.requireNonNull(value);
-        return value;
+        Objects.requireNonNull(value, "value");
+        Rarity rarity = Rarity.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        Rarity[] values = Rarity.values();
+        int next = Math.min(values.length - 1, rarity.ordinal() + 1);
+        return values[next].name();
     }
 
     public static String genName(char[] name) {
-        Objects.requireNonNull(name);
+        Objects.requireNonNull(name, "name");
         StringBuilder result = new StringBuilder(name.length);
         boolean uppercase = true;
         for (char character : name) {
