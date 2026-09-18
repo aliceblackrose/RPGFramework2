@@ -23,6 +23,7 @@ public final class ClassesCommand implements BasicCommand {
         if (player == null) {
             return;
         }
+
         var profile = players.find(player.getUniqueId()).orElse(null);
         if (profile == null) {
             CommandSupport.error(source, "Your RPG profile is still loading.");
@@ -33,6 +34,14 @@ public final class ClassesCommand implements BasicCommand {
             source.getSender().sendMessage(Component.text(
                     "Current class: " + profile.combatClass().getName(),
                     NamedTextColor.GOLD));
+            source.getSender().sendMessage(Component.text(
+                    "Use /classes list or /classes <class>.",
+                    NamedTextColor.GRAY));
+            return;
+        }
+
+        if (args[0].equalsIgnoreCase("list")) {
+            listClasses(source);
             return;
         }
 
@@ -48,6 +57,18 @@ public final class ClassesCommand implements BasicCommand {
                 NamedTextColor.GREEN));
     }
 
+    private static void listClasses(CommandSourceStack source) {
+        source.getSender().sendMessage(Component.text("Available RPG classes", NamedTextColor.GOLD));
+        Arrays.stream(Classes.values())
+                .filter(value -> value != Classes.NONE)
+                .forEach(value -> source.getSender().sendMessage(Component.text(
+                        value.getName()
+                                + " — health +" + value.healthBonus()
+                                + ", damage x" + "%.2f".formatted(value.damageMultiplier())
+                                + ", speed " + "%+.0f%%".formatted(value.speedBonus() * 100.0),
+                        NamedTextColor.GRAY)));
+    }
+
     @Override
     public String permission() {
         return "rpg.classes";
@@ -55,8 +76,13 @@ public final class ClassesCommand implements BasicCommand {
 
     @Override
     public Collection<String> suggest(CommandSourceStack source, String[] args) {
-        return Arrays.stream(Classes.values())
-                .map(value -> value.name().toLowerCase(Locale.ROOT))
-                .toList();
+        if (args.length <= 1) {
+            return java.util.stream.Stream.concat(
+                            java.util.stream.Stream.of("list"),
+                            Arrays.stream(Classes.values())
+                                    .map(value -> value.name().toLowerCase(Locale.ROOT)))
+                    .toList();
+        }
+        return java.util.List.of();
     }
 }

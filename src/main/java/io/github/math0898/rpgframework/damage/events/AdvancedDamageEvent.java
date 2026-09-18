@@ -2,6 +2,7 @@ package io.github.math0898.rpgframework.damage.events;
 
 import io.github.math0898.rpgframework.damage.DamageResistance;
 import io.github.math0898.rpgframework.damage.DamageType;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
@@ -18,11 +19,13 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
     private final EnumMap<DamageType, DamageResistance> resistances = new EnumMap<>(DamageType.class);
     private double magicResistance;
     private double physicalResistance;
+    private boolean critical;
     private boolean cancelled;
 
     public AdvancedDamageEvent(EntityDamageEvent basicEvent) {
         super(Objects.requireNonNull(basicEvent, "basicEvent").getEntity());
         this.basicEvent = basicEvent;
+
         for (DamageType type : DamageType.values()) {
             damages.put(type, 0.0);
             resistances.put(type, DamageResistance.NORMAL);
@@ -35,13 +38,25 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
     }
 
     public Map<DamageType, Double> getDamages() {
-        return damages;
+        return Collections.unmodifiableMap(damages);
+    }
+
+    public double getDamage(DamageType type) {
+        return damages.getOrDefault(Objects.requireNonNull(type, "type"), 0.0);
+    }
+
+    public void setDamage(DamageType type, double damage) {
+        Objects.requireNonNull(type, "type");
+        if (!Double.isFinite(damage)) {
+            throw new IllegalArgumentException("damage must be finite");
+        }
+        damages.put(type, Math.max(0.0, damage));
     }
 
     public void setDamages(Map<DamageType, Double> replacement) {
-        damages.clear();
+        Objects.requireNonNull(replacement, "replacement");
         for (DamageType type : DamageType.values()) {
-            damages.put(type, Math.max(0.0, replacement.getOrDefault(type, 0.0)));
+            setDamage(type, replacement.getOrDefault(type, 0.0));
         }
     }
 
@@ -49,7 +64,8 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
         if (!Double.isFinite(damage)) {
             throw new IllegalArgumentException("damage must be finite");
         }
-        damages.merge(Objects.requireNonNull(type), Math.max(0.0, damage), Double::sum);
+        DamageType checkedType = Objects.requireNonNull(type, "type");
+        damages.merge(checkedType, Math.max(0.0, damage), Double::sum);
     }
 
     public DamageType getPrimaryDamage() {
@@ -65,10 +81,11 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
     }
 
     public Map<DamageType, DamageResistance> getResistances() {
-        return resistances;
+        return Collections.unmodifiableMap(resistances);
     }
 
     public void setResistances(Map<DamageType, DamageResistance> modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
         for (DamageType type : DamageType.values()) {
             DamageResistance modifier = modifiers.get(type);
             if (modifier != null) {
@@ -78,7 +95,9 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
     }
 
     public void setResistance(DamageType type, DamageResistance resistance) {
-        resistances.put(Objects.requireNonNull(type), Objects.requireNonNull(resistance));
+        resistances.put(
+                Objects.requireNonNull(type, "type"),
+                Objects.requireNonNull(resistance, "resistance"));
     }
 
     public double getMagicResistance() {
@@ -86,7 +105,7 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
     }
 
     public void setMagicResistance(double resistance) {
-        magicResistance = resistance;
+        magicResistance = requireFinite(resistance, "magicResistance");
     }
 
     public double getPhysicalResistance() {
@@ -94,7 +113,15 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
     }
 
     public void setPhysicalResistance(double resistance) {
-        physicalResistance = resistance;
+        physicalResistance = requireFinite(resistance, "physicalResistance");
+    }
+
+    public boolean isCritical() {
+        return critical;
+    }
+
+    public void setCritical(boolean critical) {
+        this.critical = critical;
     }
 
     @Override
@@ -114,6 +141,13 @@ public final class AdvancedDamageEvent extends EntityEvent implements Cancellabl
 
     public static HandlerList getHandlerList() {
         return HANDLERS;
+    }
+
+    private static double requireFinite(double value, String name) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException(name + " must be finite");
+        }
+        return value;
     }
 
     private static DamageType fromCause(EntityDamageEvent.DamageCause cause) {

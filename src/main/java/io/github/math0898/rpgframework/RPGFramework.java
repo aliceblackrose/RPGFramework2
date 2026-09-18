@@ -47,7 +47,7 @@ public final class RPGFramework extends JavaPlugin {
         cooldownService = new CooldownService();
 
         PlayerManager.bind(playerService);
-        DataManager.bind(profileRepository, playerService);
+        DataManager.bind(playerService);
         PartyManager.bind(partyService);
         ItemManager.bind(itemRegistry);
 
@@ -84,7 +84,7 @@ public final class RPGFramework extends JavaPlugin {
     private void registerListeners() {
         var manager = Bukkit.getPluginManager();
         manager.registerEvents(new PlayerLifecycleListener(playerService, combatService, cooldownService), this);
-        manager.registerEvents(new AdvancedDamageHandler(), this);\n        manager.registerEvents(new VanillaItemListener(itemRegistry), this);
+        manager.registerEvents(new AdvancedDamageHandler(this, playerService, combatService), this);\n        manager.registerEvents(new VanillaItemListener(itemRegistry), this);
         manager.registerEvents(new PartyListener(this, partyService), this);
     }
 
