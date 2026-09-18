@@ -1,5 +1,6 @@
 package io.github.math0898.rpgframework.parties;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -12,7 +13,7 @@ public final class Party {
     private final LinkedHashSet<UUID> members = new LinkedHashSet<>();
 
     public Party(UUID leader) {
-        this.leader = Objects.requireNonNull(leader);
+        this.leader = Objects.requireNonNull(leader, "leader");
         members.add(leader);
     }
 
@@ -21,7 +22,7 @@ public final class Party {
     }
 
     public Set<UUID> members() {
-        return Set.copyOf(members);
+        return Collections.unmodifiableSet(new LinkedHashSet<>(members));
     }
 
     public boolean contains(UUID playerId) {
@@ -32,18 +33,23 @@ public final class Party {
         return members.size();
     }
 
+    public boolean isFull() {
+        return members.size() >= DEFAULT_MAX_SIZE;
+    }
+
     public boolean add(UUID playerId, boolean bypassLimit) {
-        Objects.requireNonNull(playerId);
+        Objects.requireNonNull(playerId, "playerId");
         if (members.contains(playerId)) {
             return false;
         }
-        if (!bypassLimit && members.size() >= DEFAULT_MAX_SIZE) {
+        if (!bypassLimit && isFull()) {
             return false;
         }
         return members.add(playerId);
     }
 
     public boolean remove(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
         if (!members.remove(playerId)) {
             return false;
         }
@@ -58,6 +64,7 @@ public final class Party {
     }
 
     public void transferLeadership(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
         if (!members.contains(playerId)) {
             throw new IllegalArgumentException("New leader is not in the party");
         }

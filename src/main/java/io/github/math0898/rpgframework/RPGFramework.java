@@ -9,7 +9,7 @@ import io.github.math0898.rpgframework.commands.StatsCommand;
 import io.github.math0898.rpgframework.damage.AdvancedDamageHandler;
 import io.github.math0898.rpgframework.items.ItemManager;
 import io.github.math0898.rpgframework.items.ItemRegistry;\nimport io.github.math0898.rpgframework.items.VanillaItemListener;
-import io.github.math0898.rpgframework.parties.PartyManager;
+import io.github.math0898.rpgframework.parties.PartyListener;\nimport io.github.math0898.rpgframework.parties.PartyManager;
 import io.github.math0898.rpgframework.parties.PartyService;
 import io.github.math0898.rpgframework.player.CombatService;
 import io.github.math0898.rpgframework.player.PlayerLifecycleListener;
@@ -85,7 +85,7 @@ public final class RPGFramework extends JavaPlugin {
         var manager = Bukkit.getPluginManager();
         manager.registerEvents(new PlayerLifecycleListener(playerService, combatService, cooldownService), this);
         manager.registerEvents(new AdvancedDamageHandler(), this);\n        manager.registerEvents(new VanillaItemListener(itemRegistry), this);
-        manager.registerEvents(PartyManager.listener(), this);
+        manager.registerEvents(new PartyListener(this, partyService), this);
     }
 
     private void registerCommands() {
