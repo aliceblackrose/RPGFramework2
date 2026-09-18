@@ -3,7 +3,7 @@ version: '${version}'
 main: io.github.math0898.rpgframework.RPGFramework
 api-version: '26.2'
 authors: [Sugaku, Cybellereaper, AliceBlackRose]
-description: Modern Paper 26.2 RPG framework rewritten for Java 25.
+description: Java 25 / Paper 26.2 RPG framework prototype.
 prefix: RPG Framework
 load: POSTWORLD
 permissions:
@@ -15,15 +15,7 @@ permissions:
     default: true
   rpg.stats:
     default: true
-  rpg.tutorial:
-    default: true
-  rpg.updates:
-    default: true
-  rpg.artifact:
-    default: true
   rpg.admin:
-    default: op
-  rpg.beta:
     default: op
   rpg.parties.maxbypass:
     default: op
